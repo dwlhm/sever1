@@ -1,6 +1,7 @@
 require('dotenv/config');
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 const firebase = require('firebase');
 
 const app = express();
@@ -27,23 +28,36 @@ app.get("/", (req, res) => {
 	res.send("Hello World");
 });
 
-app.get("/data/:lattitude/:longitude/:jalan", (req, res) => {
-	let lattitude = req.params.lattitude;
-	let longitude = req.params.longitude;
-	let jalan = req.params.jalan;
+app.get("/data/:lattitude/:longitude/:angkotId", (req, res) => {
+	let lattitude = String(req.params.lattitude);
+	let longitude = String(req.params.longitude);
+	let angkotId = String(req.params.angkotId);
 
-	try {
-      db.collection("angkot").add({
-        lattitude: lattitude,
-        longitude: longitude,
-        jalan: jalan,
-        date: firebase.firestore.FieldValue.serverTimestamp()
-      })
-      res.send("sukses");
-  	} catch(error) {
-  		console.log(error);
-  		res.send("error");
-  	}
+	axios.get("https://reverse.geocoder.api.here.com/6.2/reversegeocode.json?prox=" + String(lattitude) + "%2C" + String(longitude) + "%2C250&mode=retrieveAddresses&maxresults=1&gen=9&app_id=9fqnaB6d6rLJWxFpNASK&app_code=RoB26jtN0zFQ1BBhPdJe2A")
+			.then((response) => {
+			console.log(response.data.Response.View[0].Result[0].Location.Address.Street);
+			var akol = String(response.data.Response.View[0].Result[0].Location.Address.Street);
+			try {
+				db.collection("angkotData").doc(angkotId).update({ jalan: akol })
+		      	db.collection("angkot").add({
+			      	angkotId: angkotId,
+			        lattitude: lattitude,
+			        longitude: longitude,
+			        date: firebase.firestore.FieldValue.serverTimestamp()
+		      	})
+		      	db.collection("angkotData").doc(angkotId).get().then( doc => {
+		      		res.json(doc.data());
+		      	})
+		  	} catch(error) {
+		  		console.log(error);
+		  		res.send("error");
+		  	}
+		})
+		.catch( (error) => {
+	    	console.log(error);
+		})
+
+	
 })
 
 app.get("/data1/:gas", (req, res) => {
