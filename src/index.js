@@ -91,13 +91,15 @@ app.get("/data/:lattitude/:longitude/:angkotId", (req, res) => {
 					        .then(function (response) {
 					            //handle success
 					            console.log(response);
-					            res.data("no data");
+					            res.send("keluar rute");
 					        })
 					        .catch(function (response) {
 					            //handle error
 					            console.log(response);
-					            res.data("no data");
+					            res.send("no data");
 					        });
+
+					        
 		 					
 		 				} else {
 		 					db.collection("penumpang").where("jalan", "==", akol).where("angkotId", "==", angkotId).get().then(response => {
@@ -111,6 +113,9 @@ app.get("/data/:lattitude/:longitude/:angkotId", (req, res) => {
 							      				distance = turf.distance(from, to, options);
 									            if (distance < 2) {
 									            	naik++;
+									            	db.collection("penumpang").doc(String(doc.data().token)).set({
+									            		angkot: angkotId
+									            	})
 									            } else {
 									            	console.log("jauh");
 									            }
@@ -183,11 +188,25 @@ app.get("/data1/:gas", (req, res) => {
 
 app.get("/update/penumpang/naik/:token", (req, res) => {
 	let token = String(req.params.token);
+	let angkotId = String(req.params.angkotId);
+
 	try {
 		db.collection("penumpang").doc(token).update({
 			status: "diangkot"
 		})
-		res.send("sukses");
+		db.collection("penumpang").doc(token).get().then(doc => {
+			let angkots = String(doc.data().angkot);
+			console.log(angkots);
+			if (angkots == undefined) {
+				res.send("error undefined");
+			} else {
+				db.collection("angkotData").doc(angkots).get().then(doc => {
+					res.json([doc.data()]);
+				})
+			}
+		})
+		
+		
 	} catch(error) {
 		console.log(error);
 		res.send("error");
@@ -200,7 +219,30 @@ app.get("/update/penumpang/turun/:token", (req, res) => {
 		db.collection("penumpang").doc(token).update({
 			status: "turun"
 		})
-		res.send("sukses");
+
+		db.collection("penumpang").doc(token).get().then(doc => {
+			let angkots = String(doc.data().angkot);
+			console.log(angkots);
+			if (angkots == undefined) {
+				res.send("error undefined");
+			} else {
+				db.collection("angkotData").doc(angkots).get().then(doc => {
+					let turuns = Number(doc.data().turun);
+					let penumpangs = Number(doc.data().penumpang);
+					turuns--;
+					penumpangs++;
+					db.collection("angkotData").doc(angkots).update({
+						turun: turuns,
+						penumpang: penumpangs
+					}).then(() => {
+						res.send("sukses26");
+					}).catch((error) => {
+						console.log(error);
+						res.send("error26")
+					})
+				})
+			}
+		})
 	} catch(error) {
 		console.log(error);
 		res.send("error");
@@ -212,48 +254,20 @@ app.get("/penumpang/:latitude/:longitude/:nama/:token", (req, res) => {
 	let longitude = Number(req.params.longitude);
 	let token = String(req.params.token);
 	let nama = String(req.params.nama);
+	console.log(latitude);
+	console.log(longitude);
 	axios.get("https://reverse.geocoder.api.here.com/6.2/reversegeocode.json?prox=" + String(latitude) + "%2C" + String(longitude) + "%2C250&mode=retrieveAddresses&maxresults=1&gen=9&app_id=9fqnaB6d6rLJWxFpNASK&app_code=RoB26jtN0zFQ1BBhPdJe2A")
 		.then((response) => {
-			console.log(response.data.Response.View[0].Result[0].Location.Address.Street);
-			var akol = String(response.data.Response.View[0].Result[0].Location.Address.Street);
+			console.log(response.data.Response.View[0].Result[0].Location.Address.Subdistrict);
+			var akol = String(response.data.Response.View[0].Result[0].Location.Address.Subdistrict);
 			try {
 				db.collection("penumpang").doc(token).set({
 					nama: nama,
 					latitude: latitude,
 					longitude: longitude,
 					status: "menunggu",
+					token: token,
 					jalan: akol
-				})
-				res.send("sukses");
-			} catch(error) {
-				console.log(error);
-				res.send("error");
-			}
-		})
-		.catch((error) => {
-			console.log(error);
-			res.send("jaaringan");
-		})
-})
-
-app.get("/penumpang/:angkotId/:latitude/:longitude/:nama/:token", (req, res) => {
-	let angkotId = String(req.params.angkotId);
-	let latitude = String(req.params.latitude);
-	let longitude = String(req.params.longitude);
-	let nama = String(req.params.nama);
-	let token = String(req.params.token);
-	axios.get("https://reverse.geocoder.api.here.com/6.2/reversegeocode.json?prox=" + String(latitude) + "%2C" + String(longitude) + "%2C250&mode=retrieveAddresses&maxresults=1&gen=9&app_id=9fqnaB6d6rLJWxFpNASK&app_code=RoB26jtN0zFQ1BBhPdJe2A")
-		.then((response) => {
-			console.log(response.data.Response.View[0].Result[0].Location.Address.Street);
-			var akol = String(response.data.Response.View[0].Result[0].Location.Address.Street);
-			try {
-				db.collection("penumpang").doc(token).set({
-					nama: nama,
-					latitude: latitude,
-					longitude: longitude,
-					status: "menunggu",
-					jalan: akol,
-					angkotId: angkotId
 				})
 				res.send("sukses");
 			} catch(error) {
